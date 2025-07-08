@@ -1,10 +1,12 @@
 import { Component } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-home',
-  templateUrl: './home.component.html',
-  standalone: false,
+  standalone: true,
+  imports: [CommonModule],
+  template: `<h1>Welcome {{ firstName }}</h1>`
 })
 export class HomeComponent {
   firstName = '';

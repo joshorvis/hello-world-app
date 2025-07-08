@@ -1,13 +1,12 @@
 import { Component } from '@angular/core';
 import {RouterModule} from '@angular/router';
-import {AuthService} from './services/auth.service';
 
 @Component({
   selector: 'app-root',
-  templateUrl: './app.component.html',
-  styleUrls: ['./app.component.css'],
   standalone: true,
-  imports: [ RouterModule ]
+  templateUrl: './app.component.html',
+  imports: [ RouterModule ],
+  styleUrls: ['./app.component.css']
 })
 export class AppComponent {
   title = 'hello-world-app';
