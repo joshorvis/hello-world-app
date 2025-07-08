@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { Auth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from '@angular/fire/auth';
+import { Auth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, FacebookAuthProvider, signOut } from '@angular/fire/auth';
 import { Firestore, collection, addDoc } from '@angular/fire/firestore';
 import { Router } from '@angular/router';
 
@@ -24,5 +24,25 @@ export class AuthService {
 
     await addDoc(collection(this.firestore, 'users'), this.UserData);
     this.router.navigate(['/home']);
+  }
+
+  async loginWithGoogle() {
+    const provider = new GoogleAuthProvider();
+    const result = await signInWithPopup(this.auth, provider);
+    this.UserData = result.user;
+    this.router.navigate(['/home']);
+  }
+
+  async loginWithFacebook() {
+    const provider = new FacebookAuthProvider();
+    const result = await signInWithPopup(this.auth, provider);
+    this.UserData = result.user;
+    this.router.navigate(['/home']);
+  }
+
+  async logout() {
+    await signOut(this.auth);
+    this.UserData = null;
+    this.router.navigate(['/']);
   }
 }

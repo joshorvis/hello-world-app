@@ -25,4 +25,12 @@ export class LoginComponent {
   login() {
     this.authService.login(this.email, this.password);
   }
+
+  loginWithGoogle() {
+    this.authService.loginWithGoogle();
+  }
+
+  loginWithFacebook() {
+    this.authService.loginWithFacebook();
+  }
 }
