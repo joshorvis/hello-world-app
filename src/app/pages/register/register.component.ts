@@ -1,11 +1,10 @@
 import { Component } from '@angular/core';
-import { AuthService } from '../../services/auth';
-import {FormsModule} from '@angular/forms';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-register',
   templateUrl: './register.component.html',
-  imports: [FormsModule],
+  standalone: false,
 })
 export class RegisterComponent {
   form = {
