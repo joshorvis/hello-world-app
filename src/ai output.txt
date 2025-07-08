@@ -1,0 +1,199 @@
+// src/app/app.module.ts
+import { ApplicationConfig } from '@angular/core';
+import { provideHttpClient } from '@angular/common/http';
+import { provideRouter } from '@angular/router';
+import { bootstrapApplication } from '@angular/platform-browser';
+
+import { AppComponent } from './app.component';
+import { routes } from './app.routes';
+
+import { provideFirebaseApp, initializeApp } from '@angular/fire/app';
+import { provideAuth, getAuth } from '@angular/fire/auth';
+import { provideFirestore, getFirestore } from '@angular/fire/firestore';
+import { environment } from '../environments/environment';
+
+export const appConfig: ApplicationConfig = {
+  providers: [
+    provideHttpClient(),
+    provideRouter(routes),
+    provideFirebaseApp(() => initializeApp(environment.firebaseConfig)),
+    provideAuth(() => getAuth()),
+    provideFirestore(() => getFirestore()),
+  ]
+};
+
+bootstrapApplication(AppComponent, appConfig).catch(err => console.error(err));
+
+
+// src/app/app.component.ts
+import { Component } from '@angular/core';
+import { RouterModule } from '@angular/router';
+
+@Component({
+  selector: 'app-root',
+  standalone: true,
+  imports: [RouterModule],
+  templateUrl: './app.component.html',
+  styleUrls: ['./app.component.css']
+})
+export class AppComponent {
+  title = 'hello-world-app';
+}
+
+
+// src/app/app.component.html
+<router-outlet></router-outlet>
+
+
+// src/app/app.routes.ts
+import { Routes } from '@angular/router';
+import { LoginComponent } from './pages/login/login.component';
+import { RegisterComponent } from './pages/register/register.component';
+import { HomeComponent } from './pages/home/home.component';
+
+export const routes: Routes = [
+  { path: '', component: LoginComponent },
+  { path: 'register', component: RegisterComponent },
+  { path: 'home', component: HomeComponent },
+  { path: '**', redirectTo: '' }
+];
+
+
+// src/app/services/auth.service.ts
+import { Injectable } from '@angular/core';
+import { Auth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from '@angular/fire/auth';
+import { Firestore, collection, addDoc } from '@angular/fire/firestore';
+import { Router } from '@angular/router';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class AuthService {
+  public UserData: any = null;
+
+  constructor(private auth: Auth, private firestore: Firestore, private router: Router) {}
+
+  async login(email: string, password: string) {
+    const result = await signInWithEmailAndPassword(this.auth, email, password);
+    this.UserData = result.user;
+    this.router.navigate(['/home']);
+  }
+
+  async register(userForm: any) {
+    const { email, password, ...profile } = userForm;
+    const result = await createUserWithEmailAndPassword(this.auth, email, password);
+    this.UserData = { uid: result.user.uid, email, ...profile };
+
+    await addDoc(collection(this.firestore, 'users'), this.UserData);
+    this.router.navigate(['/home']);
+  }
+}
+
+
+// src/app/pages/login/login.component.ts
+import { Component } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { RouterModule } from '@angular/router';
+import { AuthService } from '../../services/auth.service';
+
+@Component({
+  selector: 'app-login',
+  standalone: true,
+  imports: [CommonModule, FormsModule, RouterModule],
+  templateUrl: './login.component.html'
+})
+export class LoginComponent {
+  email = '';
+  password = '';
+  logoSvg = `
+    <svg width="100" height="100" viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r="45" fill="#4CAF50" />
+      <text x="50%" y="55%" text-anchor="middle" fill="white" font-size="18" font-family="Arial" dy=".3em">LOGO</text>
+    </svg>
+  `;
+
+  constructor(private authService: AuthService) {}
+
+  login() {
+    this.authService.login(this.email, this.password);
+  }
+}
+
+
+// src/app/pages/login/login.component.html
+<div style="text-align: center; margin-top: 40px;">
+  <div [innerHTML]="logoSvg"></div>
+  <h2>Log In</h2>
+  <form (ngSubmit)="login()">
+    <input [(ngModel)]="email" name="email" type="email" placeholder="Email" required />
+    <br />
+    <input [(ngModel)]="password" name="password" type="password" placeholder="Password" required />
+    <br />
+    <button type="submit">Log In</button>
+  </form>
+  <a routerLink="/register">New User? Create an account now.</a>
+</div>
+
+
+// src/app/pages/register/register.component.ts
+import { Component } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { AuthService } from '../../services/auth.service';
+
+@Component({
+  selector: 'app-register',
+  standalone: true,
+  imports: [CommonModule, FormsModule],
+  templateUrl: './register.component.html'
+})
+export class RegisterComponent {
+  form = {
+    firstName: '',
+    lastName: '',
+    username: '',
+    email: '',
+    password: '',
+  };
+
+  constructor(private authService: AuthService) {}
+
+  register() {
+    this.authService.register(this.form);
+  }
+}
+
+
+// src/app/pages/register/register.component.html
+<h2>Welcome</h2>
+<p>It's free (and quick) to create an account.</p>
+<form (ngSubmit)="register()">
+  <input [(ngModel)]="form.firstName" name="firstName" placeholder="First Name" required />
+  <input [(ngModel)]="form.lastName" name="lastName" placeholder="Last Name" required />
+  <input [(ngModel)]="form.username" name="username" placeholder="Username" required />
+  <input [(ngModel)]="form.email" name="email" type="email" placeholder="Email" required />
+  <input [(ngModel)]="form.password" name="password" type="password" placeholder="Password" required />
+  <br />
+  <button type="submit">Create Account</button>
+</form>
+
+
+// src/app/pages/home/home.component.ts
+import { Component } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { AuthService } from '../../services/auth.service';
+
+@Component({
+  selector: 'app-home',
+  standalone: true,
+  imports: [CommonModule],
+  template: `<h1>Welcome {{ firstName }}</h1>`
+})
+export class HomeComponent {
+  firstName = '';
+
+  constructor(private authService: AuthService) {
+    this.firstName = this.authService.UserData?.firstName || 'User';
+  }
+}
