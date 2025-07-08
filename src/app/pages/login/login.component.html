@@ -1,16 +1,18 @@
-<div style="text-align: center; margin-top: 40px;">
-  <div [innerHTML]="logoSvg"></div>
-  <h2>Log In</h2>
-  <form (ngSubmit)="login()">
-    <input [(ngModel)]="email" name="email" type="email" placeholder="Email" required />
-    <br />
-    <input [(ngModel)]="password" name="password" type="password" placeholder="Password" required />
-    <br />
-    <button type="submit">Log In</button>
-  </form>
-  <p>or</p>
-  <button (click)="loginWithGoogle()">Log in with Google</button>
-  <button (click)="loginWithFacebook()">Log in with Facebook</button>
-  <br /><br />
-  <a routerLink="/register">New User? Create an account now.</a>
-</div>
+<h2>Log In</h2>
+<form (ngSubmit)="login()">
+  <mat-form-field>
+    <input matInput [(ngModel)]="email" name="email" type="email" placeholder="Email" required />
+  </mat-form-field>
+  <br />
+  <mat-form-field>
+    <input matInput [(ngModel)]="password" name="password" type="password" placeholder="Password" required />
+  </mat-form-field>
+  <br />
+  <button mat-raised-button color="primary" type="submit">Log In</button>
+</form>
+
+<p>or</p>
+<button mat-stroked-button (click)="loginWithGoogle()">Log in with Google</button>
+<button mat-stroked-button (click)="loginWithFacebook()">Log in with Facebook</button>
+<br /><br />
+<a routerLink="/register">New User? Create an account now.</a>

@@ -12,6 +12,8 @@ import { provideAuth, getAuth } from '@angular/fire/auth';
 import { provideFirestore, getFirestore } from '@angular/fire/firestore';
 import { environment } from '../environments/environment';
 
+import { provideAnimations } from '@angular/platform-browser/animations';
+
 export const appConfig: ApplicationConfig = {
   providers: [
     provideHttpClient(),
@@ -19,6 +21,7 @@ export const appConfig: ApplicationConfig = {
     provideFirebaseApp(() => initializeApp(environment.firebaseConfig)),
     provideAuth(() => getAuth()),
     provideFirestore(() => getFirestore()),
+    provideAnimations(),
   ]
 };
 
@@ -28,20 +31,32 @@ bootstrapApplication(AppComponent, appConfig).catch(err => console.error(err));
 // src/app/app.component.ts
 import { Component } from '@angular/core';
 import { RouterModule } from '@angular/router';
+import { MatToolbarModule } from '@angular/material/toolbar';
+import { MatButtonModule } from '@angular/material/button';
+import { AuthService } from './services/auth.service';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterModule],
+  imports: [RouterModule, MatToolbarModule, MatButtonModule],
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.css']
 })
 export class AppComponent {
-  title = 'hello-world-app';
+  constructor(public authService: AuthService) {}
+
+  logout() {
+    this.authService.logout();
+  }
 }
 
 
 // src/app/app.component.html
+<mat-toolbar color="primary">
+  <span>Hello World App</span>
+  <span class="spacer"></span>
+  <button mat-button *ngIf="authService.UserData" (click)="logout()">Log Out</button>
+</mat-toolbar>
 <router-outlet></router-outlet>
 
 
@@ -50,19 +65,41 @@ import { Routes } from '@angular/router';
 import { LoginComponent } from './pages/login/login.component';
 import { RegisterComponent } from './pages/register/register.component';
 import { HomeComponent } from './pages/home/home.component';
+import { canActivate } from './guards/auth.guard';
 
 export const routes: Routes = [
   { path: '', component: LoginComponent },
   { path: 'register', component: RegisterComponent },
-  { path: 'home', component: HomeComponent },
+  { path: 'home', component: HomeComponent, canActivate: [canActivate] },
   { path: '**', redirectTo: '' }
 ];
+
+
+// src/app/guards/auth.guard.ts
+import { inject } from '@angular/core';
+import { CanActivateFn, Router } from '@angular/router';
+import { Auth } from '@angular/fire/auth';
+
+export const canActivate: CanActivateFn = () => {
+  const auth = inject(Auth);
+  const router = inject(Router);
+  return new Promise<boolean>((resolve) => {
+    const unsub = auth.onAuthStateChanged(user => {
+      unsub();
+      if (user) resolve(true);
+      else {
+        router.navigate(['/']);
+        resolve(false);
+      }
+    });
+  });
+};
 
 
 // src/app/services/auth.service.ts
 import { Injectable } from '@angular/core';
 import { Auth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, FacebookAuthProvider, signOut } from '@angular/fire/auth';
-import { Firestore, collection, addDoc } from '@angular/fire/firestore';
+import { Firestore, collection, addDoc, setDoc, doc, getDoc } from '@angular/fire/firestore';
 import { Router } from '@angular/router';
 
 @Injectable({
@@ -84,7 +121,12 @@ export class AuthService {
     const result = await createUserWithEmailAndPassword(this.auth, email, password);
     this.UserData = { uid: result.user.uid, email, ...profile };
 
-    await addDoc(collection(this.firestore, 'users'), this.UserData);
+    await setDoc(doc(this.firestore, 'users', result.user.uid), {
+      ...profile,
+      email,
+      method: 'email'
+    });
+
     this.router.navigate(['/home']);
   }
 
@@ -92,6 +134,22 @@ export class AuthService {
     const provider = new GoogleAuthProvider();
     const result = await signInWithPopup(this.auth, provider);
     this.UserData = result.user;
+
+    const nameParts = result.user.displayName?.split(' ') || [];
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+
+    const userRef = doc(this.firestore, 'users', result.user.uid);
+    const existing = await getDoc(userRef);
+    if (!existing.exists()) {
+      await setDoc(userRef, {
+        firstName,
+        lastName,
+        email: result.user.email,
+        method: 'google'
+      });
+    }
+
     this.router.navigate(['/home']);
   }
 
@@ -99,6 +157,22 @@ export class AuthService {
     const provider = new FacebookAuthProvider();
     const result = await signInWithPopup(this.auth, provider);
     this.UserData = result.user;
+
+    const nameParts = result.user.displayName?.split(' ') || [];
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+
+    const userRef = doc(this.firestore, 'users', result.user.uid);
+    const existing = await getDoc(userRef);
+    if (!existing.exists()) {
+      await setDoc(userRef, {
+        firstName,
+        lastName,
+        email: result.user.email,
+        method: 'facebook'
+      });
+    }
+
     this.router.navigate(['/home']);
   }
 
@@ -110,130 +184,21 @@ export class AuthService {
 }
 
 
-// src/app/pages/login/login.component.ts
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { RouterModule } from '@angular/router';
-import { AuthService } from '../../services/auth.service';
-
-@Component({
-  selector: 'app-login',
-  standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
-  templateUrl: './login.component.html'
-})
-export class LoginComponent {
-  email = '';
-  password = '';
-  logoSvg = `
-    <svg width="100" height="100" viewBox="0 0 100 100">
-      <circle cx="50" cy="50" r="45" fill="#4CAF50" />
-      <text x="50%" y="55%" text-anchor="middle" fill="white" font-size="18" font-family="Arial" dy=".3em">LOGO</text>
-    </svg>
-  `;
-
-  constructor(private authService: AuthService) {}
-
-  login() {
-    this.authService.login(this.email, this.password);
-  }
-
-  loginWithGoogle() {
-    this.authService.loginWithGoogle();
-  }
-
-  loginWithFacebook() {
-    this.authService.loginWithFacebook();
-  }
-}
-
-
-// src/app/pages/login/login.component.html
-<div style="text-align: center; margin-top: 40px;">
-  <div [innerHTML]="logoSvg"></div>
-  <h2>Log In</h2>
-  <form (ngSubmit)="login()">
-    <input [(ngModel)]="email" name="email" type="email" placeholder="Email" required />
-    <br />
-    <input [(ngModel)]="password" name="password" type="password" placeholder="Password" required />
-    <br />
-    <button type="submit">Log In</button>
-  </form>
-  <p>or</p>
-  <button (click)="loginWithGoogle()">Log in with Google</button>
-  <button (click)="loginWithFacebook()">Log in with Facebook</button>
-  <br /><br />
-  <a routerLink="/register">New User? Create an account now.</a>
-</div>
-
-
-// src/app/pages/register/register.component.ts
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { AuthService } from '../../services/auth.service';
-
-@Component({
-  selector: 'app-register',
-  standalone: true,
-  imports: [CommonModule, FormsModule],
-  templateUrl: './register.component.html'
-})
-export class RegisterComponent {
-  form = {
-    firstName: '',
-    lastName: '',
-    username: '',
-    email: '',
-    password: '',
-  };
-
-  constructor(private authService: AuthService) {}
-
-  register() {
-    this.authService.register(this.form);
-  }
-}
-
-
-// src/app/pages/register/register.component.html
-<h2>Welcome</h2>
-<p>It's free (and quick) to create an account.</p>
-<form (ngSubmit)="register()">
-  <input [(ngModel)]="form.firstName" name="firstName" placeholder="First Name" required />
-  <input [(ngModel)]="form.lastName" name="lastName" placeholder="Last Name" required />
-  <input [(ngModel)]="form.username" name="username" placeholder="Username" required />
-  <input [(ngModel)]="form.email" name="email" type="email" placeholder="Email" required />
-  <input [(ngModel)]="form.password" name="password" type="password" placeholder="Password" required />
-  <br />
-  <button type="submit">Create Account</button>
-</form>
-
-
 // src/app/pages/home/home.component.ts
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, RouterModule],
-  template: `
-    <h1>Welcome {{ firstName }}</h1>
-    <button (click)="logout()">Log Out</button>
-  `
+  imports: [CommonModule],
+  template: `<h1>Welcome {{ firstName }}</h1>`
 })
 export class HomeComponent {
   firstName = '';
 
   constructor(private authService: AuthService) {
-    this.firstName = this.authService.UserData?.firstName || 'User';
-  }
-
-  logout() {
-    this.authService.logout();
+    this.firstName = this.authService.UserData?.firstName || this.authService.UserData?.displayName?.split(' ')[0] || 'User';
   }
 }

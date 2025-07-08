@@ -1,11 +1,23 @@
+// src/app/services/auth.service.ts
 import { Injectable } from '@angular/core';
-import { Auth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, FacebookAuthProvider, signOut } from '@angular/fire/auth';
-import { Firestore, collection, addDoc } from '@angular/fire/firestore';
+import {
+  Auth,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
+  FacebookAuthProvider,
+  signOut
+} from '@angular/fire/auth';
+import {
+  Firestore,
+  doc,
+  setDoc,
+  getDoc
+} from '@angular/fire/firestore';
 import { Router } from '@angular/router';
 
-@Injectable({
-  providedIn: 'root'
-})
+@Injectable({ providedIn: 'root' })
 export class AuthService {
   public UserData: any = null;
 
@@ -22,7 +34,12 @@ export class AuthService {
     const result = await createUserWithEmailAndPassword(this.auth, email, password);
     this.UserData = { uid: result.user.uid, email, ...profile };
 
-    await addDoc(collection(this.firestore, 'users'), this.UserData);
+    await setDoc(doc(this.firestore, 'users', result.user.uid), {
+      ...profile,
+      email,
+      method: 'email'
+    });
+
     this.router.navigate(['/home']);
   }
 
@@ -30,6 +47,22 @@ export class AuthService {
     const provider = new GoogleAuthProvider();
     const result = await signInWithPopup(this.auth, provider);
     this.UserData = result.user;
+
+    const nameParts = result.user.displayName?.split(' ') || [];
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+
+    const userRef = doc(this.firestore, 'users', result.user.uid);
+    const existing = await getDoc(userRef);
+    if (!existing.exists()) {
+      await setDoc(userRef, {
+        firstName,
+        lastName,
+        email: result.user.email,
+        method: 'google'
+      });
+    }
+
     this.router.navigate(['/home']);
   }
 
@@ -37,6 +70,22 @@ export class AuthService {
     const provider = new FacebookAuthProvider();
     const result = await signInWithPopup(this.auth, provider);
     this.UserData = result.user;
+
+    const nameParts = result.user.displayName?.split(' ') || [];
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+
+    const userRef = doc(this.firestore, 'users', result.user.uid);
+    const existing = await getDoc(userRef);
+    if (!existing.exists()) {
+      await setDoc(userRef, {
+        firstName,
+        lastName,
+        email: result.user.email,
+        method: 'facebook'
+      });
+    }
+
     this.router.navigate(['/home']);
   }
 
